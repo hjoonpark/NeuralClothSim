@@ -1,0 +1,61 @@
+[33mcommit ec9931934307e215c661303c4f7df6787a1e14a2[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m)[m
+Author: hjoonpark <hjoonpark.us@gmail.com>
+Date:   Fri Jul 4 18:34:06 2025 -0500
+
+    trains on tf gpu
+
+[33mcommit 237eb2c37ff65971cfcff111e95ef35933513ed8[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: HugoBA92 <hugo_bertiche@hotmail.com>
+Date:   Wed Mar 1 18:10:39 2023 +0100
+
+    training script no longer removes logs/ckpts of previous runs of the same experiment. Now it warns the user and stops the script
+
+[33mcommit c271232f19d5db0983d689bf83aa15c661026429[m
+Author: hbertiche <hugo_bertiche@hotmail.com>
+Date:   Wed Mar 1 17:51:02 2023 +0100
+
+    Update README.md
+
+[33mcommit f47c9d0ebc67a5905558313341a642394e8fe994[m
+Author: HugoBA92 <hugo_bertiche@hotmail.com>
+Date:   Wed Mar 1 17:49:37 2023 +0100
+
+    added scripts to process Mixamo FBX files into NPZ files (usable by the code)
+
+[33mcommit 485e2906af3b6614364c9fc3e3bf20d46c979485[m
+Author: hbertiche <hugo_bertiche@hotmail.com>
+Date:   Thu Feb 16 17:56:15 2023 +0100
+
+    Update README.md
+    
+    fixed some URLs
+
+[33mcommit 91ad2e368a43db6dab759c9ad96a480998c41cff[m
+Author: hbertiche <hugo_bertiche@hotmail.com>
+Date:   Sat Dec 17 09:12:59 2022 +0100
+
+    Update README.md
+
+[33mcommit 5cae2a06a0c23c1f3b2753925d8e60af8197ffb3[m
+Author: hbertiche <hugo_bertiche@hotmail.com>
+Date:   Thu Dec 15 19:06:11 2022 +0100
+
+    Update README.md
+
+[33mcommit 21af94f87e78fc5e64d004b236c169b48a951aab[m
+Author: hbertiche <hugo_bertiche@hotmail.com>
+Date:   Thu Dec 15 18:58:57 2022 +0100
+
+    Update README.md
+
+[33mcommit ed1ba2816ca2a2a29419b4f9bc86e27a3cf51b67[m
+Author: HugoBA92 <hugo_bertiche@hotmail.com>
+Date:   Wed Dec 14 18:29:24 2022 +0100
+
+    README.md created
+
+[33mcommit 8465ec510eeb74c4ebc1cdc97cc0dcdecd59083d[m
+Author: HugoBA92 <hugo_bertiche@hotmail.com>
+Date:   Wed Dec 14 18:26:37 2022 +0100
+
+    first commit

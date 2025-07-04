@@ -1,0 +1,22 @@
+name: ncs
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python = 3.10
+  - numpy = 1.26
+  - scipy
+  - pandas
+  - pip
+  - tensorflow = 2.12.*
+  - scikit-learn
+  - scikit-image
+  - py-opencv
+  - cython
+  - trimesh
+  - networkx
+  - pip:
+      - keras<3
+      - ray==2.10.0
+      - open3d==0.18.0
+      - typing-extensions<4.6

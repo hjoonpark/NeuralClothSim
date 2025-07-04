@@ -24,14 +24,32 @@ def make_model(config):
     return model
 
 
+import os
 def main(config):
+    os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    os.environ["TF_CPP_MIN_VLOG_LEVEL"] = "0"
+    os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+    
+    import logging
+    tf.get_logger().setLevel("ERROR")
+    logging.getLogger("tensorflow").setLevel(logging.ERROR)
+
     # Remove previous runs logs and checkpoints for this experiment
     log_dir = os.path.join(LOGS_DIR, config.name)
     checkpoint_dir = os.path.join(CHECKPOINTS_DIR, config.name)
     if os.path.isdir(log_dir) or os.path.isdir(checkpoint_dir):
-        print(f"There already are logs/checkpoints for an experiment with the same name. Experiment name: {config.name}")
-        print("Please remove or rename the logs/checkpoints. Alternatively, rename the experiment (JSON file name).")
-        return
+        rmtree(log_dir, ignore_errors=True)
+        rmtree(checkpoint_dir, ignore_errors=True)
+        print("="*40)
+        print(f"WARNING: Removed existing directories for experiment '{config.name}'")
+        print("="*40)
+        # print(f"There already are logs/checkpoints for an experiment with the same name. Experiment name: {config.name}")
+        # print("Please remove or rename the logs/checkpoints. Alternatively, rename the experiment (JSON file name).")
+        # return
+
+    os.makedirs(log_dir, exist_ok=True)
+    os.makedirs(checkpoint_dir, exist_ok=True)
 
     print("Initializing model...")
     if len(gpus) > 1:
@@ -62,6 +80,7 @@ def main(config):
             ),
         ],
     )
+
 
 
 if __name__ == "__main__":
