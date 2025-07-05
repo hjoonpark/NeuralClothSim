@@ -187,11 +187,16 @@ class NCS(tf.keras.Model):
     def train_step(self, inputs):
         with tf.GradientTape() as tape:
             body, vertices, unskinned = self(inputs, training=True)
+                
+            self.debug_body = body
+            self.debug_vertices = vertices
+            self.debug_unskinned = unskinned
             loss = self.compute_losses_and_metrics(
                 body, vertices, unskinned, training=True
             )
         gradients = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
+
         return {m.name: m.result() for m in self.metrics}
 
     def test_step(self, inputs):
@@ -233,49 +238,73 @@ class NCS(tf.keras.Model):
         matrices = tf.gather(matrices, self.body.input_joints, axis=-3)
         garment = self.lbs_cloth(unskinned, matrices)
         return body[0], garment[0], unskinned[0]
-
+    
     def call(self, inputs, w=None, training=False):
-        poses, trans = inputs
-        # Make input feats
-        X, matrices = self.call_inputs(poses, trans)
-        # Call network
-        deformations = self.call_network(X, w=w, training=training)
-        # Compute body LBS
-        body = self.lbs_body(self.body.vertices, matrices[:, -1])
-        # Compute garment LBS
-        unskinned = self.garment.vertices + deformations
-        matrices = tf.gather(matrices, self.body.input_joints, axis=-3)
-        garment = self.lbs_cloth(unskinned, matrices[:, -3:])
+        poses, trans = inputs  # poses: (B, T, J=24, 4), trans: (B, T, 3)
+
+        # Compute input features and transformation matrices
+        X, matrices = self.call_inputs(poses, trans)  # X: (B, T=9, J'=15, 21), matrices: (B, T=9, J=24, 3, 4)
+
+        # Predict vertex-level deformations
+        deformations = self.call_network(X, w=w, training=training)  # (B, 3, 4424, 3)
+
+        # Apply skinning to body mesh
+        body = self.lbs_body(self.body.vertices, matrices[:, -1])  # (B, 6890, 3)
+
+        # Add deformations to garment template vertices
+        unskinned = self.garment.vertices + deformations  # (B, 3, 4424, 3)
+
+        # Get relevant joint matrices for garment skinning
+        matrices = tf.gather(matrices, self.body.input_joints, axis=-3)  # (B, 9, 15, 3, 4)
+
+        # Apply skinning to garment vertices
+        garment = self.lbs_cloth(unskinned, matrices[:, -3:])  # (B, 3, 4424, 3)
+
         return body, garment, unskinned[:, -1]
 
+
     def call_inputs(self, poses, trans):
-        # Compute local rotation matrices
-        rotations = self.rot(poses)
-        # Compute global transformation matrices
-        matrices = self.body.forward_kinematics(rotations, trans)
-        matrices_inv = tf.linalg.matrix_transpose(matrices[..., :3])
-        # 6D descriptors
-        X = tf.reshape(rotations[..., :2], (*tf_shape(rotations)[:-2], 6))
-        # Unposed gravity
+        # Convert 6D pose input into rotation matrices
+        rotations = self.rot(poses)  # (B, T=11, J=24, 3, 3)
+
+        # Compute forward kinematics to get global transformation matrices
+        matrices = self.body.forward_kinematics(rotations, trans)  # (B, T=11, J=24, 3, 4)
+
+        # Get inverse rotation parts only (used for unposing)
+        matrices_inv = tf.linalg.matrix_transpose(matrices[..., :3])  # (B, T=11, J=24, 3, 3)
+
+        # 6D rotation descriptor: flatten first 2 columns of rotation matrices
+        X = tf.reshape(rotations[..., :2], (*tf_shape(rotations)[:-2], 6))  # (B, T=11, J=24, 6)
+
+        # Project gravity vector into unposed local frames
         Z = (
             matrices_inv
             @ self.gravity_loss.gravity[:, None]
             * (1 / tf.norm(self.gravity_loss.gravity))
-        )[..., 0]
-        # Combine
-        X = tf.concat((X, Z), axis=-1)
-        # Compute joint locations
-        J = self.skeleton(matrices)
-        # Compute joint temporal derivatives
-        dX = compute_nth_derivative(X, 1, self.config.time_step)[:, 1:]
-        dJ = compute_nth_derivative(J, 2, self.config.time_step)
-        # Unpose accelerations
-        dJ = (matrices_inv[:, 2:] @ dJ[..., None])[..., 0]
-        # Combine
-        X = tf.concat((X[:, 2:], dX, dJ), axis=-1)
-        # Gather relevant joints only
-        X = tf.gather(X, self.body.input_joints, axis=-2)
-        return X, matrices[:, 2:]
+        )[..., 0]  # (B, T=11, J=24, 3)
+
+        # Combine pose descriptors with gravity
+        X = tf.concat((X, Z), axis=-1)  # (B, T=11, J=24, 9)
+
+        # Joint positions
+        J = self.skeleton(matrices)  # (B, T=11, J=24, 3)
+
+        # Compute velocity of 6D features (1st temporal derivative)
+        dX = compute_nth_derivative(X, 1, self.config.time_step)[:, 1:]  # (B, T=9, J=24, 9)
+
+        # Compute acceleration of joint positions (2nd temporal derivative)
+        dJ = compute_nth_derivative(J, 2, self.config.time_step)  # (B, T=9, J=24, 3)
+
+        # Unpose acceleration into local frame
+        dJ = (matrices_inv[:, 2:] @ dJ[..., None])[..., 0]  # (B, T=9, J=24, 3)
+
+        # Final input feature: static + velocity + acceleration
+        X = tf.concat((X[:, 2:], dX, dJ), axis=-1)  # (B, T=9, J=24, 21)
+
+        # Retain only selected joints (J' = 15)
+        X = tf.gather(X, self.body.input_joints, axis=-2)  # (B, T=9, J'=15, 21)
+
+        return X, matrices[:, 2:]  # Drop first 2 frames (B, 9, 24, 3, 4)
 
     def call_network(self, x, w, training, predict=False):
         # Split static and dynamic features

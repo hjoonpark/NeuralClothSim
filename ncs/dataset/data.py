@@ -32,11 +32,18 @@ class Data(Sequence):
 
     # Read names of sequence files from a txt
     def read_txt(self):
+        print("=" * 40)
+        print("Starting to read sequences from txt file:")
+        print(f"File path: {self.txt}")
         with open(self.txt, "r") as f:
             self.sequences = [
                 os.path.join(DATA_DIR, self.config.data.dataset, line.replace("\n", ""))
                 for line in f.readlines()
             ]
+            for line_idx, txt in enumerate(self.sequences):
+                print("   [{}/{}] {}".format(line_idx+1, len(self.sequences), txt))
+        print("=" * 40)
+        print()
 
     # Loads the sequence data into PoseSequence objects (See 'sequence.py')
     def read_sequences(self):

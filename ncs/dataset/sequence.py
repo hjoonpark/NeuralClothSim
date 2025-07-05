@@ -6,6 +6,9 @@ from utils.rotation import slerp, axis_angle_to_quat
 class PoseSequence:
     def __init__(self, npz_file):
         with np.load(npz_file) as data:
+            print(f"Loading sequence from {npz_file}")
+            for k, v in data.items():
+                print(f"  - {k}: {v.shape} {v.dtype}")
             self.poses = data["poses"].astype(np.float32)
             self.trans = data["trans"].astype(np.float32)
             self.fps = data["fps"]

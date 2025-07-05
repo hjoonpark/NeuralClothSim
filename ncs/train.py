@@ -2,6 +2,13 @@ import os
 import sys
 import argparse
 from shutil import rmtree
+
+
+import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["TF_CPP_MIN_VLOG_LEVEL"] = "0"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 import tensorflow as tf
 
 from model.ncs import NCS
@@ -9,6 +16,9 @@ from dataset.data import Data
 from utils.config import MainConfig
 from global_vars import LOGS_DIR, CHECKPOINTS_DIR
 
+from utils.IO import writeOBJ
+import numpy as np
+from typing import List
 
 def make_model(config):
     model = NCS(config)
@@ -23,13 +33,50 @@ def make_model(config):
         model.load_weights(checkpoint_path)
     return model
 
+class DebugCallback(tf.keras.callbacks.Callback):
+    def __init__(self, epochs_to_save: List[int]):
+        super().__init__()
+        self.epochs_to_save = set(epochs_to_save)
+        self.save_dir = './debug_outputs'
+        os.makedirs(self.save_dir, exist_ok=True)
+        print("Debugging directory:", self.save_dir)
 
-import os
+    def on_epoch_end(self, epoch, logs=None):
+        if epoch in self.epochs_to_save:
+            save_dir2 = os.path.join(self.save_dir, f"{epoch:05d}")
+            os.makedirs(save_dir2, exist_ok=True)
+            print("=== Debugging Information ===")
+            print(f"Epoch: {epoch}")
+            print("Logs:")
+            for key, value in logs.items():
+                print(f"  - {key}: {value}")
+            body = self.model.body
+            garment = self.model.garment
+
+            debug_body = self.model.debug_body.numpy()
+            debug_vertices = self.model.debug_vertices.numpy()
+            debug_unskinned = self.model.debug_unskinned.numpy()
+            print(f"  >> body: {debug_body.shape}")
+            print(f"  >> garment: {debug_vertices.shape}")
+            print(f"  >> unskinned: {debug_unskinned.shape}")
+            for batch_idx in range(debug_body.shape[0]):
+                save_path = os.path.join(save_dir2, f"{epoch:05d}_{batch_idx:02d}_body.obj")
+                writeOBJ(save_path, debug_body[batch_idx].tolist(), body.faces)
+                print(f"  [{batch_idx+1}/{debug_body.shape[0]}] saved body to", save_path)
+
+                save_path = os.path.join(save_dir2, f"{epoch:05d}_{batch_idx:02d}_garment.obj")
+                garment_vertices = debug_vertices[batch_idx][..., -1].transpose(1,0)
+                writeOBJ(save_path, garment_vertices.tolist(), garment.faces)
+                print(f"  [{batch_idx+1}/{debug_body.shape[0]}] saved garment to", save_path)
+
+                save_path = os.path.join(save_dir2, f"{epoch:05d}_{batch_idx:02d}_garment_unskinned.obj")
+                writeOBJ(save_path, debug_unskinned[batch_idx].tolist(), garment.faces)
+                print(f"  [{batch_idx+1}/{debug_body.shape[0]}] saved unskinned garment to", save_path)
+            print("=============================")
+
+
+            
 def main(config):
-    os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-    os.environ["TF_CPP_MIN_VLOG_LEVEL"] = "0"
-    os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
     
     import logging
     tf.get_logger().setLevel("ERROR")
@@ -78,6 +125,10 @@ def main(config):
             tf.keras.callbacks.ModelCheckpoint(
                 filepath=checkpoint_dir, save_freq="epoch"
             ),
+            DebugCallback(epochs_to_save=[
+                1, 5, 10, 20, 50, 100, 200, 300, 400, 500,
+                1000, 1500, 2000, 2500, 3000, 4000, 5000
+            ])
         ],
     )
 
